@@ -2,6 +2,10 @@
 
 class WordpressXMLTest extends BuildTask {
 
+	protected $title = "Wordpress Import: XML Test";
+
+	protected $description = "Parse the XML via DOMDocument to show any parsing errors with XML easier";
+
 	public function newline() {
 		return (Director::is_cli()) ? "\n" : "<br />";
 	}

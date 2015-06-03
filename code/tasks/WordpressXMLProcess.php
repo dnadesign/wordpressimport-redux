@@ -2,6 +2,10 @@
 
 class WordpressXMLProcess extends BuildTask {
 
+	protected $title = "Wordpress Import: XML Process";
+
+	protected $description = "Process any WordpressXML files that have ProcessNow set to true";
+
 	public function newline() {
 		return (Director::is_cli()) ? "\n" : "<br />";
 	}

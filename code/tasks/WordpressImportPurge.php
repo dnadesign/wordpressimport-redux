@@ -2,6 +2,11 @@
 
 class WordpressImportPurge extends BuildTask {
 
+	protected $title = "Wordpress Import: Purge";
+
+	protected $description = "Delete all posts, comments that have been imported";
+
+
 	public function init() {
 		parent::init();
 
