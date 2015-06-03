@@ -1,17 +1,17 @@
 <?php
 /*
- * WpParser class 
+ * WpParser class
  * Version		0.1
  * By			Saophalkun Ponlu @ Silverstripe
  *
- * This class is responsible for parsing Wordpress XML file into array of post entries. 
+ * This class is responsible for parsing Wordpress XML file into array of post entries.
  * Post entry itself is an array containing entry data
  * Post entry (array):
  * 		Title 			(mapped to SS blog entry)
- * 		Link 
+ * 		Link
  * 		Author 			(mapped to SS blog entry)
  * 		Date 			(mapped to SS blog entry)
- * 		UrlTitle 
+ * 		UrlTitle
  * 		Tags 			(mapped to SS blog entry)
  * 		Content 		(mapped to SS blog entry)
  * 		Comments (array)
@@ -22,6 +22,8 @@
 
 class WpParser
 {
+	private $filename;
+
 	private $simple_xml;
 
 	// xml namespaces
@@ -34,7 +36,13 @@ class WpParser
 	 * List of "tag" types that should be converted to tags
 	 * @var array List of valid tags
 	 */
-	public static $allowed_category_domains = array('category', 'post_tag');
+	public static $allowed_category_domains = array('category');
+
+	/**
+	 * List of "tag" types that should be converted to tags
+	 * @var array List of valid tags
+	 */
+	public static $allowed_tag_domains = array('tag');
 
 	/**
 	 * List of "page" types that should be converted to BlogEntry items
@@ -43,8 +51,7 @@ class WpParser
 	public static $allowed_page_types = array('post');
 
 	public function __construct($filename) {
-		$this->simple_xml = simplexml_load_file($filename) or die('Cannot open file.');
-		$this->namespaces = $this->simple_xml->getNamespaces(TRUE);
+		$this->filename = $filename;
 	}
 
 	/*
@@ -61,19 +68,40 @@ class WpParser
 	 * @param array $cats list of categories
 	 * @return string A string of comma separated tag values
 	 */
-	public function ParseTags($cats) {
+	public function ParseCategories($cats) {
 		// Uses this array to check if the category to be added already exists in the post
 		$categories = array();
 		foreach ($cats as $cat)
-		{			
+		{
 			// Cleanup multiline and other whitespace characters
 			$catName = html_entity_decode(trim(preg_replace('/\s+/m', ' ', (string)$cat)));
-			
+
 			// is this in tags or categories? We only want categories to become SS Tags
 			if (in_array($cat['domain'], self::$allowed_category_domains) && !in_array($catName, $categories))
 				$categories[] = (string) $catName;
 		}
-		return join(', ', $categories);
+		return $categories;
+	}
+
+	/**
+	 * Extracts the categories from the blog post in the form of a single tag
+	 * value suitable for BlogPost
+	 * @param array $cats list of categories
+	 * @return string A string of comma separated tag values
+	 */
+	public function ParseTags($tags) {
+		// Uses this array to check if the category to be added already exists in the post
+		$tagsArray = array();
+		foreach ($tags as $tag)
+		{
+			// Cleanup multiline and other whitespace characters
+			$tagName = html_entity_decode(trim(preg_replace('/\s+/m', ' ', (string)$tag)));
+
+			// is this in tags or categories? We only want categories to become SS Tags
+			if (in_array($tag['domain'], self::$allowed_tag_domains) && !in_array($tagName, $tagsArray))
+				$tagsArray[] = (string) $tagName;
+		}
+		return $tagsArray;
 	}
 
 	/**
@@ -84,7 +112,7 @@ class WpParser
 	public function ParseBlogContent($content) {
 
 		// Convert wordpress-style image links to silverstripe asset filepaths
-		$content = preg_replace('/(http:\/\/[\w\.\/]+)?\/wp-content\/uploads\//i', '/assets/Uploads/', $content);
+		$content = preg_replace('/(http:\/\/[\w\.\/]+)?\/wp-content\/uploads\//i', '/assets/Uploads/blog/', $content);
 
 		// Split multi-line blocks into paragraphs
 		$split = preg_split('/\s*\n\s*\n\s*/im', $content);
@@ -94,13 +122,13 @@ class WpParser
 			$paragraph = trim($paragraph);
 			if (empty($paragraph))
 				continue;
-			
+
 			if(preg_match('/^<p>.*/i', $paragraph))
 				$content .= $paragraph;
 			else
 				$content .= "<p>$paragraph</p>";
 		}
-		
+
 		// Split single-line blocks with line-breaks
 		$content = nl2br($content);
 
@@ -131,7 +159,7 @@ class WpParser
 	 */
 	protected function parseComments($wp_ns) {
 
-		// Array of comments of a post 
+		// Array of comments of a post
 		$comments = array();
 		foreach ($wp_ns->comment as $comment)
 			$comments[] = $this->parseComment($comment);
@@ -158,6 +186,7 @@ class WpParser
 			'Title' => (string) $item->title,
 			'Link' => (string) $item->link,
 			'Author' => (string) $dc_ns->creator,
+			'Categories' => $this->ParseCategories($item->category),
 			'Tags' => $this->ParseTags($item->category),
 			'Content' => $this->ParseBlogContent((string) $content_ns->encoded),
 			'URLSegment' => (string) $wp_ns->post_name,
@@ -173,16 +202,18 @@ class WpParser
 	 * Parses xml in $simple_xml to array of blog posts
 	 * @return array of posts
 	 */
-
 	public function parse() {
-		$namespaces = $this->namespaces;
+		$this->simple_xml = simplexml_load_file($this->filename, 'SimpleXMLElement');
+
+		$namespaces = $this->simple_xml->getNamespaces(TRUE);
 
 		$posts = array();
 		foreach ($this->simple_xml->channel->item as $item)
 		{
 			// Import this post if a valid item is returned
-			if ($post = $this->parsePost($item, $namespaces))
+			if ($post = $this->parsePost($item, $namespaces)) {
 				$posts[] = $post;
+			}
 		}
 		return $this->posts = $posts;
 	}

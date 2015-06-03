@@ -5,62 +5,7 @@ require('WpParser.php');
  * Decorates a BlogHolder page type, specified in _config.php
  */
 
-class WpImporter extends DataExtension
-{
-
-	public function updateCMSFields(FieldList $fields) {
-		$html_str = '<iframe name="WpImport" src="WpImporter_Controller/index/' . $this->owner->ID . '" width="500"> </iframe>';
-		$fields->addFieldToTab('Root.Import', new LiteralField("ImportIframe", $html_str));
-	}
-
-}
-
-class WpImporter_Controller extends Controller
-{
-	private static $allowed_actions = array(
-		'index',
-		'UploadForm',
-		'doUpload'
-	);
-
-	public function init() {
-		parent::init();
-
-		// Do security check in case this controller is called by unauthorised user using direct url
-		if (!Permission::check("ADMIN"))
-			Security::permissionFailure();
-
-		// Check for requirements
-		if (!class_exists('BlogHolder'))
-			user_error('Please install the blog module before importing from Wordpress', E_USER_ERROR);
-	}
-
-	public function index($request) {
-		return $this->renderWith('WpImporter');
-	}
-
-	protected function getBlogHolderID() {
-		if (isset($_REQUEST['BlogHolderID']))
-			return $_REQUEST['BlogHolderID'];
-
-		return $this->request->param('ID');
-	}
-
-	/*
-	 * Outputs an file upload form
-	 */
-
-	public function UploadForm() {
-		return Form::create($this, "UploadForm",
-						FieldList::create(
-							FileField::create("XMLFile", 'Wordpress XML file'),
-							HiddenField::create("BlogHolderID", '', $this->getBlogHolderID())
-						),
-						FieldList::create(
-							FormAction::create('doUpload', 'Import Wordpress XML file')
-						)
-		);
-	}
+class WpImporter {
 
 	protected function getOrCreateComment($wordpressID) {
 		if ($wordpressID && $comment = Comment::get()->filter(array('WordpressID' => $wordpressID))->first())
@@ -83,30 +28,76 @@ class WpImporter_Controller extends Controller
 		}
 	}
 
-	protected function getOrCreatePost($wordpressID) {
-		if ($wordpressID && $post = BlogEntry::get()->filter(array('WordpressID' => $wordpressID))->first())
-			return $post;
+	protected function importTagsAndCategories($post, $entry) {
+		if (!class_exists('Comment'))
+			return;
 
-		return BlogEntry::create();
+		$tags = $post['Tags'];
+		foreach ($tags as $tag) {
+			$tagOb = BlogTag::get()->filter(array(
+				'Title' => $tag,
+				'BlogID' => $entry->ParentID
+			));
+			if ($tagOb->exists()) {
+				$tagOb = $tagOb->First();
+			} else {
+				$tagOb = new BlogTag();
+				$tagOb->BlogID = $entry->ParentID;
+				$tagOb->Title = $tag;
+				$tagOb->write();
+			}
+			$entry->Tags()->add($tagOb);
+		}
+		$categories = $post['Categories'];
+		foreach ($categories as $category) {
+			$catOb = BlogCategory::get()->filter(array(
+				'Title' => $category,
+				'BlogID' => $entry->ParentID
+			));
+			if ($catOb->exists()) {
+				$catOb = $catOb->First();
+			} else {
+				$catOb = new BlogCategory();
+				$catOb->BlogID = $entry->ParentID;
+				$catOb->Title = $category;
+				$catOb->write();
+			}
+			$entry->Categories()->add($catOb);
+		}
 	}
 
-	protected function importPost($post) {
+	protected function importAuthor($post, $entry) {
+		$member = Member::get()->filter(array(
+			'WordpressSlug' => $post['Author'],
+		));
+		if ($member->exists()) {
+			$member = $member->First();
+			$entry->Authors()->add($member);
+		}
+	}
+
+	protected function getOrCreatePost($wordpressID) {
+		if ($wordpressID && $post = BlogPost::get()->filter(array('WordpressID' => $wordpressID))->first())
+			return $post;
+
+		return BlogPost::create();
+	}
+
+	protected function importPost($post, $file) {
 		// create a blog entry
 		$entry = $this->getOrCreatePost($post['WordpressID']);
 
-		$entry->ParentID = $this->getBlogHolderID();
+		$entry->ParentID = $file->BlogID;
 
 		// $posts array and $entry have the same key/field names
 		// so we can use update here.
-
 		$entry->update($post);
+		$this->importAuthor($post, $entry);
+		$this->importTagsAndCategories($post, $entry);
 
-		//Create an initial write as a draft copy otherwise a write() 
-		//in SS3.1.2+ will go live and never have a draft Version.
-		//@see http://doc.silverstripe.org/framework/en/changelogs/3.1.2#default-current-versioned-
-		//stage-to-live-rather-than-stage for details.
-		$entry->writeToStage('Stage');
-		
+		Versioned::reading_stage('Stage');
+
+		$entry->write();
 		//If the post was published on WP, now ensure it is also live in SS.
 		if ($post['IsPublished']){
 			$entry->publish("Stage", "Live");
@@ -117,34 +108,25 @@ class WpImporter_Controller extends Controller
 		return $entry;
 	}
 
-	public function doUpload($data, $form) {
+	function newline() {
+		return (Director::is_cli()) ? "\n" : "<br />";
+	}
+
+	public function process(WordpressXML $ob) {
 
 		// Checks if a file is uploaded
-		if (!is_uploaded_file($_FILES['XMLFile']['tmp_name']))
-			return;
-
-		echo '<p>Processing...<br/></p>';
-		flush();
-		$file = $_FILES['XMLFile'];
-		// check file type. only xml file is allowed
-		if ($file['type'] != 'text/xml')
-		{
-			echo 'Please select Wordpress XML file';
-			die;
-		}
+		$file = $ob->File();
 
 		// Parse posts
-		$wp = new WpParser($file['tmp_name']);
+		$wp = new WpParser(Director::baseFolder().'/'.$file->getFilename());
 		$posts = $wp->parse();
-		foreach ($posts as $post)
-			$this->importPost($post);
-
-		// delete the temporaray uploaded file
-		unlink($file['tmp_name']);
+		foreach ($posts as $post) {
+			$entry = $this->importPost($post, $ob);
+			echo 'Imported '. $entry->Title . $this->newline();
+		}
 
 		// print sucess message
-		echo 'Complete!<br/>';
-		echo 'Please refresh the admin page to see the new blog entries.';
+		return true;
 	}
 
 }
