@@ -77,8 +77,12 @@ class WpImporter {
 	}
 
 	protected function getOrCreatePost($wordpressID) {
-		if ($wordpressID && $post = BlogPost::get()->filter(array('WordpressID' => $wordpressID))->first())
-			return $post;
+		if ($wordpressID) {
+			$post = BlogPost::get()->filter(array('WordpressID' => $wordpressID));
+			if ($post->exists()) {
+				return $post->First();
+			}
+		}
 
 		return BlogPost::create();
 	}
@@ -86,16 +90,14 @@ class WpImporter {
 	protected function importPost($post, $file) {
 		// create a blog entry
 		$entry = $this->getOrCreatePost($post['WordpressID']);
-
 		$entry->ParentID = $file->BlogID;
 
 		// $posts array and $entry have the same key/field names
 		// so we can use update here.
+
 		$entry->update($post);
 		$this->importAuthor($post, $entry);
 		$this->importTagsAndCategories($post, $entry);
-
-		Versioned::reading_stage('Stage');
 
 		$entry->write();
 		//If the post was published on WP, now ensure it is also live in SS.
@@ -113,7 +115,7 @@ class WpImporter {
 	}
 
 	public function process(WordpressXML $ob) {
-
+		Versioned::reading_stage('Stage');
 		// Checks if a file is uploaded
 		$file = $ob->File();
 
