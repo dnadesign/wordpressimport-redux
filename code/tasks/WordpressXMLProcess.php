@@ -13,6 +13,7 @@ class WordpressXMLProcess extends BuildTask {
 			echo 'Processing ' . $file->File()->getFilename() . $this->newline();
 			$importer = new WpImporter();
             $success = $importer->process($file);
+            $file->ProcessingNow = false;
             $file->ProcessingDate = date('Y-m-d H:i:s');
             $file->write();
 		}

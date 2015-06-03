@@ -67,7 +67,7 @@ class WordpressXML extends DataObject {
 	}
 
 	public function getDate() {
-		return $this->Origin.'ed on '.$this->dbObject('UploadingDate')->Nice();
+		return $this->dbObject('UploadingDate')->Nice();
 	}
 
 	public function getProcessed() {
