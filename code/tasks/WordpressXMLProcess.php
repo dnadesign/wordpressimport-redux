@@ -9,14 +9,15 @@ class WordpressXMLProcess extends BuildTask {
 	// controller action to be run by default
 	public function run($request) {
 		$files = WordpressXML::get()->filter(array('ProcessNow' => true));
+		$count = $files->Count();
 		foreach($files as $file) {
 			echo 'Processing ' . $file->File()->getFilename() . $this->newline();
-			$importer = new WpImporter();
+			$importer = Injector::inst()->get('WpImporter');
             $success = $importer->process($file);
-            $file->ProcessingNow = false;
+            $file->ProcessNow = false;
             $file->ProcessingDate = date('Y-m-d H:i:s');
             $file->write();
 		}
-		echo 'Processed ' . $files->Count() . $this->newline();
+		echo 'Processed ' . $count . $this->newline();
 	}
 }

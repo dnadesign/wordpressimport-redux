@@ -8,7 +8,8 @@ class WordpressXML extends DataObject {
 		'Name' => 'Varchar(255)',
 		'UploadingDate' => 'SS_DateTime',
 		'ProcessNow' => 'Boolean',
-		'ProcessingDate' => 'SS_DateTime'
+		'ProcessingDate' => 'SS_DateTime',
+		'PostsAfter' => 'Date'
 	);
 
 	private static $has_one = array(
@@ -21,6 +22,7 @@ class WordpressXML extends DataObject {
 	private static $summary_fields = array(
 		'Name' => 'Name',
 		'getDate' => 'Date',
+		'PostsAfter' => 'Posts After',
 		'getProcessed' => 'Processed'
 	);
 
@@ -39,6 +41,9 @@ class WordpressXML extends DataObject {
 		$uploadField->setAllowedMaxFileNumber(1);
 		$uploadField->setFolderName('Uploads/blog/');
 		$fields->addFieldToTab('Root.Main', $uploadField);
+
+		$fields->addFieldToTab('Root.Main', $postsAfter = new DateField('PostsAfter', 'Import posts after:'));
+		$postsAfter->setRightTitle('(Jan 1, YYYY) Leave blank if all posts should be imported');
 
 		$fields->addFieldToTab('Root.Main', new CheckboxField('ProcessNow'));
 
@@ -71,10 +76,10 @@ class WordpressXML extends DataObject {
 	}
 
 	public function getProcessed() {
-		if ($this->ProcessingDate) {
-			return $this->ProcessingDate;
-		} else if ($this->ProcessNow) {
+		if ($this->ProcessNow) {
 			return 'Pending...';
+		} else if ($this->ProcessingDate) {
+			return $this->ProcessingDate;
 		}
 		return 'Waiting';
 	}

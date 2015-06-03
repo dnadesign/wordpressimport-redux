@@ -50,7 +50,7 @@ class WpParser
 	 */
 	public static $allowed_page_types = array('post');
 
-	public function __construct($filename) {
+	public function setFileName($filename) {
 		$this->filename = $filename;
 	}
 

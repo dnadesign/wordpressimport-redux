@@ -88,6 +88,7 @@ class WpImporter {
 	}
 
 	protected function importPost($post, $file) {
+		Versioned::reading_stage('Stage');
 		// create a blog entry
 		$entry = $this->getOrCreatePost($post['WordpressID']);
 		$entry->ParentID = $file->BlogID;
@@ -120,11 +121,21 @@ class WpImporter {
 		$file = $ob->File();
 
 		// Parse posts
-		$wp = new WpParser(Director::baseFolder().'/'.$file->getFilename());
+		$wp = Injector::inst()->get('WpParser');
+		$wp->setFileName(Director::baseFolder().'/'.$file->getFilename());
 		$posts = $wp->parse();
 		foreach ($posts as $post) {
-			$entry = $this->importPost($post, $ob);
-			echo 'Imported '. $entry->Title . $this->newline();
+			if ($ob->PostsAfter) {
+				if(strtotime($ob->PostsAfter) < strtotime($post['Date'])) {
+					$entry = $this->importPost($post, $ob);
+					echo 'Imported '. $entry->Title . $this->newline();
+				} else {
+					echo 'Skipped '. $post['Title'] . $this->newline();
+				}
+			} else {
+				$entry = $this->importPost($post, $ob);
+				echo 'Imported '. $entry->Title . $this->newline();
+			}
 		}
 
 		// print sucess message
