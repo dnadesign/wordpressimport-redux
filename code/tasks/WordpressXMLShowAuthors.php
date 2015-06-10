@@ -17,6 +17,7 @@ class WordpressXMLShowAuthors extends BuildTask {
 		if ($files->exists()) {
 			foreach($files as $file) {
 				if ($file->FileID) {
+					if ($file->File()->getExtension() != 'xml') continue;
 					echo 'Processing ' . $file->File()->getFilename() . $this->newline();
 					$importer = Injector::inst()->get('WpImporter');
 					$authors = $importer->showAuthors($file);
