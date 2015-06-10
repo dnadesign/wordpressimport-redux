@@ -190,9 +190,9 @@ class WpParser
 			'Tags' => $this->ParseTags($item->category),
 			'Content' => $this->ParseBlogContent((string) $content_ns->encoded),
 			'URLSegment' => (string) $wp_ns->post_name,
-			'Date' => (string) $wp_ns->post_date,
 			'Comments' => $this->parseComments($wp_ns),
 			'WordpressID' => intval($wp_ns->post_id),
+			'PublishDate' => (string) $wp_ns->post_date,
 			'ProvideComments' => ($wp_ns->comment_status == 'open'),
 			'IsPublished' => ($wp_ns->status == 'publish') // Used later to trigger ->publish in the importer
 		);

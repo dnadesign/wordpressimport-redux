@@ -126,20 +126,34 @@ class WpImporter {
 		$posts = $wp->parse();
 		foreach ($posts as $post) {
 			if ($ob->PostsAfter) {
-				if(strtotime($ob->PostsAfter) < strtotime($post['Date'])) {
+				if(strtotime($ob->PostsAfter) < strtotime($post['PublishDate'])) {
 					$entry = $this->importPost($post, $ob);
 					echo 'Imported '. $entry->Title . $this->newline();
 				} else {
-					echo 'Skipped '. $post['Title'] . $this->newline();
+					// echo 'Skipped '. $post['Title'] . $this->newline();
 				}
 			} else {
 				$entry = $this->importPost($post, $ob);
 				echo 'Imported '. $entry->Title . $this->newline();
 			}
 		}
-
 		// print sucess message
 		return true;
+	}
+
+	public function showAuthors(WordpressXML $ob) {
+		$wp = Injector::inst()->get('WpParser');
+		$wp->setFileName(Director::baseFolder().'/'.$ob->File()->getFilename());
+		$authors = array();
+		$posts = $wp->parse();
+		foreach ($posts as $post) {
+			if (!isset($authors[$post['Author']])) {
+				$authors[$post['Author']] = 1;
+			} else {
+				$authors[$post['Author']]++;
+			}
+		}
+		return $authors;
 	}
 
 }
